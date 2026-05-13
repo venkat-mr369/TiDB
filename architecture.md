@@ -1,5 +1,8 @@
 Great topic. Let me explain TiDB's architecture using an options trading platform as the use case — since that fits what you're learning.Think of TiDB as a distributed SQL database built for workloads that a single MySQL server couldn't survive — which is exactly the workload an options trading platform creates. Imagine you're building something like Zerodha or Interactive Brokers: millions of options orders flowing in every minute during market hours, every order must be durably saved (you cannot lose a buy/sell), analysts need to run SQL like `SELECT * FROM orders WHERE strike = 25000 AND expiry = '2026-05-29'`, and the system must scale horizontally as users multiply. A single MySQL box would buckle, and manual sharding is painful. TiDB's three-part architecture solves this by splitting responsibilities into three layers — each does exactly one thing.
 
+<img width="1440" height="920" alt="image" src="https://github.com/user-attachments/assets/5650aea0-372c-44e1-9995-b833b4f2d62a" />
+
+
 **TiDB** is the SQL frontend. It speaks the MySQL protocol, so your trading app connects to it like any normal MySQL database. It parses queries, plans them, and figures out where the data actually lives — but it stores no data itself. It is stateless. You can run ten of them behind a load balancer and they all share the same view of the world.
 
 **TiKV** is where data actually lives. It's a distributed key-value store. Your `orders` table gets chopped into chunks called *regions* (roughly 96 MB each), and each region is stored on three different TiKV nodes using the Raft consensus protocol. If one server's disk dies in the middle of market hours, your order isn't lost — the other two replicas still have it.
