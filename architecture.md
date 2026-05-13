@@ -85,3 +85,26 @@ Want to go further on any of these — for example, the exact key encoding TiKV 
 A mnemonic that sticks: **PD plans, TiDB processes, TiKV persists.**
 
 Want me to go deeper on any one piece next — how Raft actually makes a write durable (it's surprisingly intuitive once you see it), how a single SQL transaction stays consistent across multiple TiKV nodes using TSO, or how you'd design the `orders` and `option_chain` schema to keep hot rows well-distributed?
+
+Alright, plain English. Three things to cover: how rows actually sit on disk, how a write gets saved, and why your primary key choice can break the whole cluster.
+
+**How TiKV stores rows — the phone book idea.** Imagine a giant phone book where every page is sorted alphabetically. That's how TiKV stores your data. Every row in your `orders` table becomes one entry in this phone book. The "key" for each entry is built from your primary key — something like `orders_user1234_order9876`. TiKV keeps all rows sorted by this key.
+
+A *region* is just a chunk of this sorted phone book. For example:
+
+```
+Region 1:  keys "orders_user_100" to "orders_user_25000"
+Region 2:  keys "orders_user_25000" to "orders_user_50000"
+Region 3:  keys "orders_user_50000" to "orders_user_75000"
+```
+
+Because keys are sorted, all orders for user 1234 sit physically next to each other. When your trading app runs `SELECT * FROM orders WHERE user_id = 1234`, TiDB asks PD "which region holds user 1234?", goes straight to that one region on one TiKV node, and gets the rows. Fast.
+
+When a region grows past 144 MB, TiKV cuts it in half at the middle key. So Region 1 might become two regions: "user_100 to user_12000" and "user_12000 to user_25000". PD might then move one half to a TiKV node that has less data. The cluster auto-rebalances without you doing anything. This is what people mean by "TiDB auto-shards."
+
+**How a trade gets saved — the sticky notes idea.** Imagine you run a busy trading desk. Orders come in fast. You can't carefully file each one as it arrives — you'd fall behind. So you do this instead. Every order gets scribbled on a sticky note and tossed in a basket (that's fast). You also write the order on a sorted list pinned to the wall, so you can find any order quickly. During quiet times, you take the sorted list, copy it into a proper folder, and put the folder on a shelf. Over time, when small folders pile up, you merge them into bigger ones to keep the shelf tidy.
+
+That's exactly what TiKV does. The trading-desk names map like this: the sticky-note basket is the **WAL** (write-ahead log — an append-only file on disk, super fast to write to), the sorted wall list is the **memtable** (a sorted structure that lives in RAM), the folders on the shelf are the **SST files** (sorted, never-changed files on disk), and merging folders is **compaction** (a background job).
+
+<img width="1440" height="1144" alt="image" src="https://github.com/user-attachments/assets/78f0a24d-bd59-4652-b919-5c8701dcdedb" />
+
