@@ -66,7 +66,10 @@ The important mental shift: **one TiKV node does not hold one "orders table file
 - Region 122: `positions` rows for users 50,000 to 58,000
 - ...and 800 more
 
-When a region grows beyond 144 MB, TiKV splits it in two and PD reassigns one half to a less-loaded node. This is the auto-sharding that you'd otherwise have to do by hand.**A minimum production deployment for an options trading platform.** Each node type has very different resource needs, which is why they're typically run on separate machines:
+When a region grows beyond 144 MB, TiKV splits it in two and PD reassigns one half to a less-loaded node. This is the auto-sharding that you'd otherwise have to do by hand.
+<img width="1440" height="720" alt="image" src="https://github.com/user-attachments/assets/145f2e9e-1de1-417e-8683-6aa558e2bc52" />
+
+**A minimum production deployment for an options trading platform** Each node type has very different resource needs, which is why they're typically run on separate machines:
 
 - **3 PD nodes** — small machines (4 vCPU, 8 GB RAM, 100 GB SSD). Odd count for Raft majority. One is the elected leader.
 - **3 TiDB nodes** — CPU-heavy (16 vCPU, 32–64 GB RAM, modest disk for logs). Scale this tier when queries become CPU-bound at market open.
